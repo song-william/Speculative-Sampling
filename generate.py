@@ -17,7 +17,8 @@ parser.add_argument('--draft_model', required=False, help='Draft model (HF Causa
 parser.add_argument('--temperature', default=0, type=float, help='Temperature')
 args = parser.parse_args()
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "auto" if torch.cuda.is_available() else "cpu"
 
 if args.method == "speculative":
     if args.draft_model is None:
@@ -27,12 +28,29 @@ if args.method == "speculative":
     print("Using target model:", args.target_model)
     print("Using draft model:", args.draft_model)
 
-    target_model = AutoModelForCausalLM.from_pretrained(args.target_model).to(device)
-    draft_model = AutoModelForCausalLM.from_pretrained(args.draft_model).to(device)
+    print('loading target model', args.target_model)
+    start_time = time.time()
+    target_model = AutoModelForCausalLM.from_pretrained(args.target_model, device_map=device)
+    print(f'target_model loading time taken: {time.time() - start_time:.2f}s')
+    print(f'target_model device: {target_model.device}')
+    print(f'target_model device_map: {target_model.hf_device_map}')
+
+    print('loading draft model', args.draft_model)
+    start_time = time.time()
+    draft_model = AutoModelForCausalLM.from_pretrained( args.draft_model, device_map=device)
+    print(f'draft_model time taken: {time.time() - start_time:.2f}s')
+    print(f'draft_model device: {draft_model.device}')
+    print(f'draft_model device_map: {draft_model.hf_device_map}')
+
+
+
     tokenizer = AutoTokenizer.from_pretrained(args.target_model)
-
-    inputs = tokenizer(args.prompt, return_tensors="pt").to(device)
-
+    # inputs = tokenizer(args.prompt, return_tensors="pt").to(device)
+    inputs = tokenizer(args.prompt, return_tensors="pt")
+    print('inputs:')
+    print(inputs)
+    print('inputs.input_ids:')
+    print(inputs.input_ids)
     start_time = time.time_ns()
     tokens = speculative_sampling(target_model, draft_model, initial_prompt_seq=inputs.input_ids, max_new_tokens=args.max_new_tokens, tokenizer=tokenizer, temperature=args.temperature, debug=False)
     end_time = time.time_ns()
@@ -47,10 +65,15 @@ if args.method == "speculative":
 elif args.method == "autoregressive":
     print("Using target model:", args.target_model)
 
-    target_model = AutoModelForCausalLM.from_pretrained(args.target_model).to(device)
+    print('loading target model', args.target_model)
+    start_time = time.time()
+    target_model = AutoModelForCausalLM.from_pretrained(args.target_model, device_map=device)
+    print(f'target_model loading time taken: {time.time() - start_time:.2f}s')
+    print(f'target_model device: {target_model.device}')
+    print(f'target_model device_map: {target_model.hf_device_map}')
     tokenizer = AutoTokenizer.from_pretrained(args.target_model)
 
-    inputs = tokenizer(args.prompt, return_tensors="pt").to(device)
+    inputs = tokenizer(args.prompt, return_tensors="pt").to(target_model.device)
 
     start_time = time.time_ns()
     tokens = autoregressive_sampling(target_model, initial_prompt_seq=inputs.input_ids, target_len=args.max_new_tokens+len(inputs.input_ids), temperature=args.temperature)
