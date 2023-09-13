@@ -46,7 +46,9 @@ if args.method == "speculative":
 
     tokenizer = AutoTokenizer.from_pretrained(args.target_model)
     # inputs = tokenizer(args.prompt, return_tensors="pt").to(device)
-    inputs = tokenizer(args.prompt, return_tensors="pt")
+    # both the draft model and the target model seem to have the same device from 'auto'
+    assert target_model.device == draft_model.device
+    inputs = tokenizer(args.prompt, return_tensors="pt").to(target_model.device)
     print('inputs:')
     print(inputs)
     print('inputs.input_ids:')
